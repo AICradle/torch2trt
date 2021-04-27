@@ -64,9 +64,13 @@ def convert_tensor_getitem(ctx):
     
     input_dim = 0
     for s in slices:
-        
-        if input_dim >= len(input_trt.shape):
-            break
+
+        try:
+            if input_dim >= len(input_trt.shape):
+                break
+        except ValueError:
+            if input_dim >= 0:
+                break
             
         input_size = int(input_trt.shape[input_dim])
         

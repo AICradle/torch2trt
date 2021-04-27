@@ -4,20 +4,16 @@ from torch2trt.module_test import add_module_test
 
 @tensorrt_converter('torch.topk')
 def convert_topk(ctx):
-    inputs = get_arg(ctx, 'input', pos=0, default=None)
+    input = get_arg(ctx, 'input', pos=0, default=None)
     k = get_arg(ctx, 'k', pos=1, default=25)
     dim = get_arg(ctx, 'dim', pos=2, default=None)
 
     if not dim:
-        dim = len(inputs.shape) - 1
-    else:
-        dim -= 1 # TRT doesn't take into account the batch dimension therefore we cannot take topK over the batch
-
-    assert dim != -1 # if axes == -1 then user is trying to perform TopK on batch
+        raise ValueError("Unsupported None value for dim. User must input a valid dim")
 
     output_val = ctx.method_return[0]
     output_idx = ctx.method_return[1]
-    trt_inputs = add_missing_trt_tensors(ctx.network, inputs)[0]
+    trt_inputs = add_missing_trt_tensors(ctx.network, [input])[0]
 
     layer = ctx.network.add_topk(input=trt_inputs, op=trt.TopKOperation.MAX, k=k, axes=torch_dim_to_trt_axes(dim))
 
