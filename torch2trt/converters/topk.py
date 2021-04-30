@@ -9,13 +9,13 @@ def convert_topk(ctx):
     dim = get_arg(ctx, 'dim', pos=2, default=None)
 
     if not dim:
-        raise ValueError("Unsupported None value for dim. User must input a valid dim")
+        dim = len(input.shape) - 1
 
     output_val = ctx.method_return[0]
     output_idx = ctx.method_return[1]
-    trt_inputs = add_missing_trt_tensors(ctx.network, [input])[0]
+    trt_input = add_missing_trt_tensors(ctx.network, [input])[0]
 
-    layer = ctx.network.add_topk(input=trt_inputs, op=trt.TopKOperation.MAX, k=k, axes=torch_dim_to_trt_axes(dim))
+    layer = ctx.network.add_topk(input=trt_input, op=trt.TopKOperation.MAX, k=k, axes=torch_dim_to_trt_axes(dim))
 
     output_val._trt = layer.get_output(0)
     output_idx._trt = layer.get_output(1)

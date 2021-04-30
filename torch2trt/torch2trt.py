@@ -129,11 +129,14 @@ def check_torch_dtype(*tensors):
     return dtype
 
     
-def add_missing_trt_tensors(network, tensors):
+def add_missing_trt_tensors(network, tensors, check_dtypes=True):
     """Creates missing TensorRT tensors as constants and attaches them to the Torch Tensors"""
     trt_tensors = [None] * len(tensors)
 
-    dtype = check_torch_dtype(*tensors)
+    if check_dtypes:
+        dtype = check_torch_dtype(*tensors)
+    else:
+        dtype = tensors[0].dtype
 
     for i, t in enumerate(tensors):
         trt_tensor = None
