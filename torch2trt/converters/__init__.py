@@ -28,6 +28,7 @@ from .compare import *
 from .div import *
 from .expand import *
 from .floordiv import *
+from .gather import *
 from .getitem import *
 from .identity import *
 from .instance_norm import *
@@ -57,6 +58,7 @@ from .sub import *
 from .sum import *
 from .tanh import *
 from .tensor import *
+from .topk import *
 from .transpose import *
 from .unary import *
 from .view import *

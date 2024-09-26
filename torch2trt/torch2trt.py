@@ -14,6 +14,14 @@ from .calibration import (
 
 # UTILITY FUNCTIONS
 
+torch_to_numpy_dtype_dict = {
+    torch.int8: np.int8,
+    torch.int32: np.int32,
+    torch.int64: np.int32,
+    torch.float16: np.float16,
+    torch.float32: np.float32,
+    torch.float64: np.float32,
+}
 
 def trt_version():
     return trt.__version__
@@ -121,11 +129,14 @@ def check_torch_dtype(*tensors):
     return dtype
 
     
-def add_missing_trt_tensors(network, tensors):
+def add_missing_trt_tensors(network, tensors, check_dtypes=True):
     """Creates missing TensorRT tensors as constants and attaches them to the Torch Tensors"""
     trt_tensors = [None] * len(tensors)
 
-    dtype = check_torch_dtype(*tensors)
+    if check_dtypes:
+        dtype = check_torch_dtype(*tensors)
+    else:
+        dtype = tensors[0].dtype
 
     for i, t in enumerate(tensors):
         trt_tensor = None
@@ -137,6 +148,7 @@ def add_missing_trt_tensors(network, tensors):
         if isinstance(t, float) or isinstance(t, int):
             shape = (1,)
             scalar = t * torch.ones(shape, dtype=dtype).cpu().numpy()
+            scalar = trt.Weights(np.ascontiguousarray(scalar, dtype=torch_to_numpy_dtype_dict[dtype]))
             trt_tensor = network.add_constant(shape, scalar).get_output(0)
         elif hasattr(t, "_trt"):
             trt_tensor = t._trt
@@ -154,6 +166,7 @@ def add_missing_trt_tensors(network, tensors):
             shape = tuple(t.shape[num_preceding_ones:])
             
             weight = t.detach().cpu().numpy()
+            weight = trt.Weights(np.ascontiguousarray(weight, dtype=torch_to_numpy_dtype_dict[dtype]))
             t._trt = network.add_constant(shape, weight).get_output(0)
             trt_tensor = t._trt
 
@@ -170,16 +183,23 @@ def broadcast_trt_tensors(network, trt_tensors, broadcast_ndim):
     broadcasted_trt_tensors = [None] * len(trt_tensors)
     
     for i, t in enumerate(trt_tensors):
-        
-        if len(t.shape) < broadcast_ndim:
+        try:
+            if len(t.shape) < broadcast_ndim:
+                # append 1 size dims to front
+                diff = broadcast_ndim - len(t.shape)
+                shape = tuple([1] * diff + list(t.shape))
+                layer = network.add_shuffle(t)
+                layer.reshape_dims = shape
+                trt_tensor = layer.get_output(0)
+            else:
+                trt_tensor = t
+        except ValueError:
+            # if it doesn't have len then tensor is a scalar value
             # append 1 size dims to front
-            diff = broadcast_ndim - len(t.shape)
-            shape = tuple([1] * diff + list(t.shape))
+            shape = tuple([1] * broadcast_ndim)
             layer = network.add_shuffle(t)
             layer.reshape_dims = shape
             trt_tensor = layer.get_output(0)
-        else:
-            trt_tensor = t
 
         broadcasted_trt_tensors[i] = trt_tensor
         
